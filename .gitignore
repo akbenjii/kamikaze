@@ -1,0 +1,9 @@
+# Directory
+.idea/
+logs/
+node_modules/
+
+# General Use
+accounts.txt
+config/index.js
+package-lock.json
