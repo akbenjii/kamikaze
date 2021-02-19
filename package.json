@@ -1,0 +1,25 @@
+{
+  "name": "kamikaze",
+  "version": "1.0.0",
+  "description": "a cpps pcl written in nodejs",
+  "main": "src\\index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "benji",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akbenjii/kamikaze.git"
+  },
+  "bugs": {
+    "url": "https://github.com/akbenjii/kamikaze/issues"
+  },
+  "homepage": "https://github.com/akbenjii/kamikaze#readme",
+  "dependencies": {
+    "md5": "^2.3.0",
+    "winston": "^3.3.3",
+    "winston-daily-rotate-file": "^4.5.0"
+  }
+}
