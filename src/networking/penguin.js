@@ -1,10 +1,12 @@
 'use strict';
 
 const Connection = require('./Connection');
+const PacketHandler = require('../handlers/packet');
 let penguins = {};
 
-module.exports = class Penguin {
+module.exports = class Penguin extends PacketHandler {
     constructor(username, password, host, login_port, world_port) {
+        super();
         this.host = host;
         this.username = username;
         this.password = password;
@@ -13,14 +15,17 @@ module.exports = class Penguin {
 
         this.id = null;
         this.rndK = null;
-        this.login_key = null;
-        this.internal_room_id = -1;
+        this.room = -1;
+        this.coins = -1;
         this.magic = 'Y(02.>\'H}t":E1';
         this.buffer = '';
+        this.connected = false;
         this.delimiter = '\0';
+        this.login_key = null;
+        this.internal_room_id = -1;
 
         this.socket = new Connection(host, login_port).init();
-        this.start_listener();
+        this._start_listener();
     }
 
     async login() {
@@ -51,7 +56,7 @@ module.exports = class Penguin {
     join_server() {
         return new Promise(async (resolve) => {
             this.socket = new Connection(this.host, this.world_port).init();
-            this.start_listener();
+            this._start_listener();
 
             await this.send_verChk();
             await this.send_rndK();
@@ -64,10 +69,14 @@ module.exports = class Penguin {
             let packet = await this._receive_packet();
             if (packet[2] !== 'l') await this._receive_packet();
 
-            this.emit_packet('s', 'j#js', this.id, this.login_key, 'en');
-            penguins[this.username] = this.socket;
+            this._emit('s', 'j#js', this.id, this.login_key, 'en');
+            penguins[this.id] = this.socket;
 
-            resolve(logger.info('Joined server'));
+            this.connected = true;
+            resolve(logger.info(`${this.username} has joined a server.`));
+
+            this._heartbeat()
+            await this._packet_handler();
         })
     }
 
@@ -82,7 +91,7 @@ module.exports = class Penguin {
             response = await this._receive();
 
             if (response.includes('cross-domain-policy')) response = await this._receive();
-            if (response.includes('apiOK')) logger.info('Received apiOK!') && resolve('pp');
+            if (response.includes('apiOK')) logger.info(`[${this.username}] Received apiOK!`) && resolve();
             else if (response.includes('apiKO')) return reject('Received apiKO!');
             else return reject('Received invalid verChk response!');
         });
@@ -100,23 +109,20 @@ module.exports = class Penguin {
             if (!response.includes('rndK')) return reject('Received invalid rndK response.');
 
             this.rndK = /<k>(?:<!\[CDATA\[)?(.*?)(?:]]>)?<\/k>/g.exec(response)[1];
-            logger.info(`Received rndK response: ${this.rndK}`);
+            logger.info(`[${this.username}] Received rndK response: ${this.rndK}`);
             resolve();
         });
     }
 
-    emit_packet(...args) {
-        args.insert(2, this.internal_room_id);
-        const packet = `%xt%${args.join('%')}%`;
-
-        this._send(packet);
+    _start_listener() {
+        this.socket.on('data', response => this.buffer += response);
     }
 
-    start_listener() {
-        this.socket.on('data', response => {
-            logger.debug(response);
-            this.buffer += response;
-        });
+    _heartbeat() {
+        this._emit('s', 'u#h');
+        setInterval(() => {
+            this._emit('s', 'u#h');
+        }, 60000)
     }
 
     _receive() {
@@ -128,19 +134,6 @@ module.exports = class Penguin {
 
             logger.incoming(message);
             resolve(message);
-        })
-    }
-
-    _receive_packet() {
-        let data;
-        return new Promise(async (resolve, reject) => {
-            data = await this._receive();
-
-            while (!data.startsWith('%')) data = await this._receive();
-
-            const packet = data.split('%');
-            if (packet[2] === 'e') return reject(errors[packet[4]]);
-            resolve(packet);
         })
     }
 
